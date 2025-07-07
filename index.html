@@ -1,1 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SadBot Mixtral (OpenRouter.ai)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      background-color: #f0f2f5;
+      color: #333;
+    }
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    #chat {
+      width: 100%;
+      height: 300px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 14px;
+      margin-bottom: 10px;
+      background-color: #e9ebee;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    #prompt {
+      width: calc(100% - 80px);
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      margin-right: 10px;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .error-message {
+      color: red;
+      font-size: 12px;
+      margin-top: 5px;
+      display: none; /* Sembunyikan default */
+    }
+    .loading-indicator {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+      display: none; /* Sembunyikan default */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SadBot Mixtral</h1>
+    <textarea id="chat" readonly></textarea><br>
+    <input id="prompt" type="text" placeholder="Tulis pesan..." onkeypress="handleKeyPress(event)">
+    <button onclick="send()">Send</button>
+    <div id="loadingIndicator" class="loading-indicator">SadBot sedang mengetik...</div>
+    <div id="errorMessage" class="error-message"></div>
+  </div>
 
+  <script>
+    // =====================================================================
+    //           PENTING: PASTIKAN API KEY INI DARI OPENROUTER.AI
+    // =====================================================================
+    const API_KEY = "MASUKKAN_API_KEY_OPENROUTER_DI_SINI"; // <-- GANTI DENGAN API KEY ASLI DARI OPENROUTER.AI
+
+    // URL API OpenRouter.ai
+    const API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    
+    // Model AI yang ingin digunakan (Mixtral dari OpenRouter.ai)
+    const AI_MODEL = "mistralai/mixtral-8x7b-instruct"; // <-- Lo bisa ganti model lain yang didukung OpenRouter.ai
+
+    // Elemen-elemen HTML
+    const chatBox = document.getElementById("chat");
+    const promptInput = document.getElementById("prompt");
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    const errorMessageDiv = document.getElementById("errorMessage");
+
+    // Fungsi untuk menampilkan pesan ke chat box
+    function appendMessage(sender, message, isError = false) {
+      chatBox.value += `${sender}: ${message}\n`;
+      chatBox.scrollTop = chatBox.scrollHeight; // Gulirkan chat box ke bawah
+      if (isError) {
+        errorMessageDiv.textContent = message;
+        errorMessageDiv.style.display = 'block';
+      } else {
+        errorMessageDiv.textContent = '';
+        errorMessageDiv.style.display = 'none';
+      }
+    }
+
+    // Fungsi untuk menangani tombol Enter di input prompt
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        send();
+      }
+    }
+
+    // Fungsi utama untuk mengirim pesan
+    async function send() {
+      const userMessage = promptInput.value.trim();
+
+      if (userMessage === "") {
+        return; // Jangan kirim pesan kosong
+      }
+
+      appendMessage("Kamu", userMessage);
+      promptInput.value = ""; // Kosongkan input setelah pesan dikirim
+
+      loadingIndicator.style.display = 'block'; // Tampilkan indikator loading
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + API_KEY,
+            "Content-Type": "application/json",
+            "HTTP-Referer": window.location.href, // Penting untuk OpenRouter.ai
+            "X-Title": "SadBot Mixtral App" // Judul aplikasi kamu (opsional)
+          },
+          body: JSON.stringify({
+            model: AI_MODEL,
+            messages: [{ role: "user", content: userMessage }],
+            // max_tokens: 150, // Batasi panjang respons (opsional)
+            // temperature: 0.7 // Kreativitas respons (0.0 - 1.0, opsional)
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          let errorMessage = `HTTP Error ${response.status}: ${response.statusText}`;
+          if (errorData.message) {
+            errorMessage += ` - ${errorData.message}`;
+          } else if (errorData.error && errorData.error.message) {
+            errorMessage += ` - ${errorData.error.message}`;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        console.log("Full API Response:", JSON.stringify(data, null, 2)); // Untuk debugging
+
+        const aiResponseContent = data.choices?.[0]?.message?.content;
+
+        if (aiResponseContent) {
+          appendMessage("SadBot", aiResponseContent);
+        } else {
+          appendMessage("SadBot", "[Error: Respons AI tidak memiliki konten yang diharapkan. Cek konsol untuk detail.]", true);
+          console.error("API response missing content:", data);
+        }
+
+      } catch (error) {
+        let userFacingError = `[Error: Gagal terhubung atau mendapatkan respons dari SadBot.`;
+        if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+          userFacingError += ` Coba cek koneksi internetmu atau API Key.`;
+        } else if (error.message.includes("HTTP Error 401")) {
+          userFacingError += ` API Keymu mungkin tidak valid.`;
+        } else if (error.message.includes("HTTP Error 429")) {
+          userFacingError += ` Terlalu banyak permintaan (Rate Limit Exceeded). Coba lagi nanti.`;
+        } else {
+          userFacingError += ` Detail: ${error.message}.`;
+        }
+        userFacingError += `]`;
+        
+        appendMessage("SadBot", userFacingError, true);
+        console.error("Fetch or API processing error:", error);
+
+      } finally {
+        loadingIndicator.style.display = 'none';
+        promptInput.focus();
+      }
+    }
+
+    // Set fokus ke input prompt saat halaman dimuat
+    window.onload = () => {
+      promptInput.focus();
+      appendMessage("SadBot", "Halo bro! Tulis pesanmu di sini ya.");
+    };
+  </script>
+</body>
+</html>
